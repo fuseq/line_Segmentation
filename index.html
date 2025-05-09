@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Polyline Progress Tracker</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Turf.js -->
+  <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+
+  <!-- Leaflet.GeometryUtil -->
+  <script src="https://unpkg.com/leaflet-geometryutil"></script>
+
+  <style>
+    #map { height: 100vh; width: 100%; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+  // 1. Initialize map
+  const map = L.map('map').setView([37.424, 31.852], 18);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  // 2. Define start and end points (Lng, Lat for Turf.js)
+const routeCoords = [
+  [31.852198, 37.425945],
+  [31.852254, 37.425845]
+];
+
+  // 3. Create a Turf LineString
+  const line = turf.lineString(routeCoords);
+  const segmentLength = 5; // meters
+  const totalDistance = turf.length(line, { units: 'kilometers' }); // in km
+  const steps = Math.floor((totalDistance * 1000) / segmentLength); // total segments
+
+  // 4. Generate segment points
+  const points = [];
+  for (let i = 0; i <= steps; i++) {
+    const pt = turf.along(line, (i * segmentLength) / 1000, { units: 'kilometers' });
+    points.push([pt.geometry.coordinates[1], pt.geometry.coordinates[0]]); // [lat, lng]
+  }
+
+  // 5. Draw segments
+  const segmentLines = [];
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const seg = L.polyline([points[i], points[i + 1]], {
+      color: 'gray',
+      weight: 5
+    }).addTo(map);
+
+    segmentLines.push({ polyline: seg, passed: false });
+  }
+
+  // 6. Track user
+  const userMarker = L.circleMarker([0, 0], {
+    radius: 6,
+    color: 'red'
+  }).addTo(map);
+
+  function updateProgress(userLatLng) {
+    userMarker.setLatLng(userLatLng);
+
+    segmentLines.forEach(segment => {
+      if (segment.passed) return;
+
+      const latlngs = segment.polyline.getLatLngs();
+      const dist = L.GeometryUtil.distanceSegment(map, L.latLng(userLatLng), latlngs[0], latlngs[1]);
+
+      if (dist < 5) { // 5 meters threshold
+        segment.polyline.setStyle({ color: 'blue' });
+        segment.passed = true;
+      }
+    });
+  }
+
+  // 7. Watch user location
+  if ('geolocation' in navigator) {
+    navigator.geolocation.watchPosition(position => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      updateProgress([lat, lng]);
+    }, error => {
+      console.error('Geolocation error:', error);
+    }, {
+      enableHighAccuracy: true,
+      maximumAge: 1000
+    });
+  } else {
+    alert('Geolocation not supported');
+  }
+</script>
+
+</body>
+</html>
