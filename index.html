@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Polyline Progress Tracker</title>
   <meta charset="utf-8" />
@@ -16,123 +17,173 @@
   <script src="https://unpkg.com/leaflet-geometryutil"></script>
 
   <style>
-    #map { height: 100vh; width: 100%; }
+    #map {
+      height: 100vh;
+      width: 100%;
+    }
   </style>
 </head>
+
 <body>
 
-<div id="map"></div>
+  <div id="map"></div>
 
-<script>
-  // 1. Initialize map
-  const map = L.map('map').setView([37.4259, 31.8522], 20);
+  <script>
+    // 1. Initialize map
+    const map = L.map('map').setView([37.4259, 31.8522], 20);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; OpenStreetMap contributors'
-  }).addTo(map);
-
-  // 2. Define route (Lng, Lat for Turf)
-  const routeCoords = [
-    [31.852198, 37.425945],
-    [31.852254, 37.425845]
-  ];
-
-  const line = turf.lineString(routeCoords);
-  const segmentLength = 5; // meters
-  const totalDistance = turf.length(line, { units: 'kilometers' }); // in km
-  const steps = Math.floor((totalDistance * 1000) / segmentLength);
-
-  // 3. Segment points
-  const points = [];
-  for (let i = 0; i <= steps; i++) {
-    const pt = turf.along(line, (i * segmentLength) / 1000, { units: 'kilometers' });
-    points.push([pt.geometry.coordinates[1], pt.geometry.coordinates[0]]); // lat, lng
-  }
-
-  // 4. Draw segments
-  const segmentLines = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const seg = L.polyline([points[i], points[i + 1]], {
-      color: 'gray',
-      weight: 5
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-    segmentLines.push(seg);
-  }
 
-  // 5. User marker
-  const userMarker = L.circleMarker([0, 0], {
-    radius: 6,
-    color: 'red'
-  }).addTo(map);
+    // 2. Define route (Lng, Lat for Turf)
+    const routeCoords = [
+      [31.852198, 37.425945],
+      [31.852254, 37.425845]
+    ];
 
-  // 6. Guide line (from user to closest point on route)
-  let guideLine = null;
-  const SNAP_THRESHOLD = 3; // meters
+    const line = turf.lineString(routeCoords);
+    const segmentLength = 5; // meters
+    const totalDistance = turf.length(line, { units: 'kilometers' }); // in km
+    const steps = Math.floor((totalDistance * 1000) / segmentLength);
 
-  function drawGuideLine(userLatLng) {
-    const userPt = turf.point([userLatLng[1], userLatLng[0]]);
-    const snap = turf.nearestPointOnLine(line, userPt, { units: 'meters' });
-    const snapCoords = snap.geometry.coordinates;
-    const snapLatLng = [snapCoords[1], snapCoords[0]];
-    const dist = snap.properties.dist;
-
-    if (dist > SNAP_THRESHOLD) {
-      if (guideLine) map.removeLayer(guideLine);
-      guideLine = L.polyline([userLatLng, snapLatLng], {
-        color: 'red',
-        dashArray: '4,4',
-        weight: 2
-      }).addTo(map);
-    } else if (guideLine) {
-      map.removeLayer(guideLine);
-      guideLine = null;
+    // 3. Segment points
+    const points = [];
+    for (let i = 0; i <= steps; i++) {
+      const pt = turf.along(line, (i * segmentLength) / 1000, { units: 'kilometers' });
+      points.push([pt.geometry.coordinates[1], pt.geometry.coordinates[0]]); // lat, lng
     }
 
-    return snap;
-  }
+    // 4. Draw segments
+    const segmentLines = [];
+    for (let i = 0; i < points.length - 1; i++) {
+      const seg = L.polyline([points[i], points[i + 1]], {
+        color: 'gray',
+        weight: 5
+      }).addTo(map);
+      segmentLines.push(seg);
+    }
 
-  function updateProgress(userLatLng) {
-    userMarker.setLatLng(userLatLng);
+    // 5. User marker
+    const userMarker = L.circleMarker([0, 0], {
+      radius: 6,
+      color: 'red'
+    }).addTo(map);
 
-    // 1. Draw guide line and get snap point
-    const snap = drawGuideLine(userLatLng);
+    // 6. Guide line (from user to closest point on route)
+    let guideLine = null;
+    const SNAP_THRESHOLD = 3; // meters
 
-    // 2. Calculate progress distance
-    const startPt = turf.point(routeCoords[0]);
-    const snapPt = turf.point(snap.geometry.coordinates);
-    const sliced = turf.lineSlice(startPt, snapPt, line);
-    const traveledKm = turf.length(sliced, { units: 'kilometers' });
-    const traveledM = traveledKm * 1000;
+    function drawGuideLine(userLatLng) {
+      const userPt = turf.point([userLatLng[1], userLatLng[0]]);
+      const snap = turf.nearestPointOnLine(line, userPt, { units: 'meters' });
+      const snapCoords = snap.geometry.coordinates;
+      const snapLatLng = [snapCoords[1], snapCoords[0]];
+      const dist = snap.properties.dist;
 
-    // 3. Determine current segment index
-    const currentIx = Math.floor(traveledM / segmentLength);
-
-    // 4. Update segment colors
-    segmentLines.forEach((seg, idx) => {
-      if (idx < currentIx) {
-        seg.setStyle({ color: 'blue' });
-      } else {
-        seg.setStyle({ color: 'gray' });
+      if (dist > SNAP_THRESHOLD) {
+        if (guideLine) map.removeLayer(guideLine);
+        guideLine = L.polyline([userLatLng, snapLatLng], {
+          color: 'red',
+          dashArray: '4,4',
+          weight: 2
+        }).addTo(map);
+      } else if (guideLine) {
+        map.removeLayer(guideLine);
+        guideLine = null;
       }
-    });
-  }
 
-  // 7. Watch position
-  if ('geolocation' in navigator) {
-    navigator.geolocation.watchPosition(position => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      updateProgress([lat, lng]);
-    }, error => {
-      console.error('Geolocation error:', error);
-    }, {
-      enableHighAccuracy: true,
-      maximumAge: 1000
-    });
-  } else {
-    alert('Geolocation not supported');
-  }
-</script>
+      return snap;
+    }
+
+    function updateProgress(userLatLng) {
+      userMarker.setLatLng(userLatLng);
+
+      // Snap to closest point on line
+      const userPt = turf.point([userLatLng[1], userLatLng[0]]);
+      const snap = turf.nearestPointOnLine(line, userPt, { units: 'meters' });
+      const snapCoords = [snap.geometry.coordinates[1], snap.geometry.coordinates[0]];
+
+      // Draw guide line
+      drawGuideLine(userLatLng);
+
+      // Clear all segments from map
+      segmentLines.forEach(obj => {
+        map.removeLayer(obj.polyline);
+      });
+      segmentLines.length = 0;
+
+      // Redraw with partial fill
+      for (let i = 0; i < points.length - 1; i++) {
+        const start = points[i];
+        const end = points[i + 1];
+
+        const segLine = turf.lineString([
+          [start[1], start[0]],
+          [end[1], end[0]]
+        ]);
+
+        const snapDistToSeg = turf.pointToLineDistance(userPt, segLine, { units: 'meters' });
+
+        if (snapDistToSeg < segmentLength) {
+          const startPt = turf.point([start[1], start[0]]);
+          const snappedPt = turf.nearestPointOnLine(segLine, userPt, { units: 'meters' });
+
+          const snappedLatLng = [snappedPt.geometry.coordinates[1], snappedPt.geometry.coordinates[0]];
+
+          const traveled = L.polyline([start, snappedLatLng], {
+            color: 'blue',
+            weight: 5
+          }).addTo(map);
+
+          const remaining = L.polyline([snappedLatLng, end], {
+            color: 'gray',
+            weight: 5
+          }).addTo(map);
+
+          segmentLines.push({ polyline: traveled });
+          segmentLines.push({ polyline: remaining });
+        } else {
+          // Check total distance from start of route to segment start
+          const startOfRoute = turf.point(routeCoords[0]);
+          const currentStartPt = turf.point([start[1], start[0]]);
+          const sliced = turf.lineSlice(startOfRoute, currentStartPt, line);
+          const distToStart = turf.length(sliced, { units: 'meters' });
+
+          if (distToStart < snap.properties.location * turf.length(line, { units: 'meters' })) {
+            const passed = L.polyline([start, end], {
+              color: 'blue',
+              weight: 5
+            }).addTo(map);
+            segmentLines.push({ polyline: passed });
+          } else {
+            const future = L.polyline([start, end], {
+              color: 'gray',
+              weight: 5
+            }).addTo(map);
+            segmentLines.push({ polyline: future });
+          }
+        }
+      }
+    }
+
+    // 7. Watch position
+    if ('geolocation' in navigator) {
+      navigator.geolocation.watchPosition(position => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        updateProgress([lat, lng]);
+      }, error => {
+        console.error('Geolocation error:', error);
+      }, {
+        enableHighAccuracy: true,
+        maximumAge: 1000
+      });
+    } else {
+      alert('Geolocation not supported');
+    }
+  </script>
 
 </body>
+
 </html>
